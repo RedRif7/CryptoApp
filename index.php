@@ -11,7 +11,7 @@ class CryptoApp {
     private array $headers;
 
     public function __construct() {
-        $this->apiKey = '868535e9-2644-4b1e-9209-3363a0da0dd0';
+        $this->apiKey = '';
         $this->baseUrl = 'https://pro-api.coinmarketcap.com/v1/';
         $this->balance = 1000.00;
         $this->headers = [
