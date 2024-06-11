@@ -33,7 +33,27 @@ class CryptoApp {
         return $response ? json_decode($response) : null;
     }
 
-    public function displayTopTrendingCryptos() {
+    private function getCryptoBalances(): array {
+        if (file_exists('crypto_balances.json')) {
+            return json_decode(file_get_contents('crypto_balances.json'), true);
+        }
+        return [];
+    }
+
+    private function saveCryptoBalances(array $balances) {
+        file_put_contents('crypto_balances.json', json_encode($balances, JSON_PRETTY_PRINT));
+    }
+
+    private function logOrder(object $order) {
+        $orders = [];
+        if (file_exists('orders.json')) {
+            $orders = json_decode(file_get_contents('orders.json'));
+        }
+        $orders[] = $order;
+        file_put_contents('orders.json', json_encode($orders, JSON_PRETTY_PRINT));
+    }
+
+    public function displayTopCryptos() {
         $endpoint = 'cryptocurrency/listings/latest';
         $parameters = [
             'start' => '1',
@@ -43,15 +63,16 @@ class CryptoApp {
         $data = $this->makeRequest($endpoint, $parameters);
         if ($data && isset($data->data)) {
             $table = new ConsoleTable();
-            $table->setHeaders(['ID','UCID', 'Name', 'Price/Coin']);
+            $table->setHeaders(['ID','UCID', 'Name', 'Price (USD)']);
+            $id = 1;
             foreach ($data->data as $crypto) {
                 $table->addRow([
-                    $id += 1,
+                    $id++,
                     $crypto->id,
                     $crypto->name,
                     $crypto->quote->USD->price > 1 ?
-                        "$" .number_format($crypto->quote->USD->price, 2) :
-                        "$" .number_format($crypto->quote->USD->price, 10),
+                        "$" . number_format($crypto->quote->USD->price, 2) :
+                        "$" . number_format($crypto->quote->USD->price, 10)
                 ]);
             }
             $table->display();
@@ -60,8 +81,15 @@ class CryptoApp {
         }
     }
 
-    public function checkBalance() {
-        echo "Current Balance: $" . number_format($this->balance, 2) . "\n";
+    public function displayBalance() {
+        echo "Current balance: $" . number_format($this->balance, 2) . "\n";
+        $cryptoBalances = $this->getCryptoBalances();
+        if (!empty($cryptoBalances)) {
+            echo "Crypto Balances:\n";
+            foreach ($cryptoBalances as $symbol => $amount) {
+                echo "$symbol: " . number_format($amount, 8) . "\n";
+            }
+        }
     }
 
     public function searchCrypto(string $shortName) {
@@ -73,10 +101,12 @@ class CryptoApp {
         $data = $this->makeRequest($endpoint, $parameters);
         if ($data && isset($data->data->$shortName)) {
             $crypto = $data->data->$shortName;
-            echo $crypto->name;
-            echo $crypto->quote->USD->price > 1 ?
-                " $".number_format($crypto->quote->USD->price, 2) . "\n" :
-                " $".number_format($crypto->quote->USD->price, 10) . "\n";
+            echo "Name: " . $crypto->name . "\n";
+            echo "Symbol: " . $crypto->symbol . "\n";
+            echo "Price: $";
+            echo  $crypto->quote->USD->price > 1 ?
+                number_format($crypto->quote->USD->price, 2) . "\n" :
+                number_format($crypto->quote->USD->price, 10) . "\n";
         } else {
             echo "Cryptocurrency not found.\n";
         }
@@ -92,12 +122,19 @@ class CryptoApp {
         if ($data && isset($data->data->$shortName)) {
             $crypto = $data->data->$shortName;
             $price = $crypto->quote->USD->price;
-            echo "Your balance - $$this->balance \n";
             echo "Current price of $shortName: $" . number_format($price, 2) . "\n";
             $amount = (float) readline("Enter the amount to buy: ");
             $totalCost = $amount * $price;
             if ($totalCost <= $this->balance) {
                 $this->balance -= $totalCost;
+
+                $balances = $this->getCryptoBalances();
+                if (!isset($balances[$shortName])) {
+                    $balances[$shortName] = 0;
+                }
+                $balances[$shortName] += $amount;
+                $this->saveCryptoBalances($balances);
+
                 $order = (object) [
                     'time' => Carbon::now()->toDateTimeString(),
                     'crypto' => $shortName,
@@ -126,11 +163,24 @@ class CryptoApp {
         if ($data && isset($data->data->$shortName)) {
             $crypto = $data->data->$shortName;
             $price = $crypto->quote->USD->price;
-            echo "Your balance - $$this->balance \n";
             echo "Current price of $shortName: $" . number_format($price, 2) . "\n";
             $amount = (float) readline("Enter the amount to sell: ");
+
+            $balances = $this->getCryptoBalances();
+            if (!isset($balances[$shortName]) || $balances[$shortName] < $amount) {
+                echo "Insufficient crypto balance.\n";
+                return;
+            }
+
             $totalEarnings = $amount * $price;
             $this->balance += $totalEarnings;
+
+            $balances[$shortName] -= $amount;
+            if ($balances[$shortName] <= 0) {
+                unset($balances[$shortName]);
+            }
+            $this->saveCryptoBalances($balances);
+
             $order = (object) [
                 'time' => Carbon::now()->toDateTimeString(),
                 'crypto' => $shortName,
@@ -146,76 +196,69 @@ class CryptoApp {
         }
     }
 
-
-    private function logOrder(object $order) {
-        $orders = [];
+    public function displayOrders() {
         if (file_exists('orders.json')) {
             $orders = json_decode(file_get_contents('orders.json'));
-        }
-        $orders[] = $order;
-        file_put_contents('orders.json', json_encode($orders, JSON_PRETTY_PRINT));
-    }
-
-    public function displayTransactions() {
-        if (file_exists('orders.json')) {
-            $orders = json_decode(file_get_contents('orders.json'));
-            $table = new ConsoleTable();
-            $table->setHeaders(['Time', 'Crypto', 'Price', 'Action', 'Amount', 'Total']);
-            foreach ($orders as $order) {
-                $table->addRow([
-                    $order->time,
-                    $order->crypto,
-                    '$' . number_format($order->price, 2),
-                    $order->action,
-                    $order->amount,
-                    '$' . number_format($order->total, 2)
-                ]);
+            if (!empty($orders)) {
+                $table = new ConsoleTable();
+                $table->setHeaders(['Time', 'Crypto', 'Price', 'Action', 'Amount', 'Total']);
+                foreach ($orders as $order) {
+                    $table->addRow([
+                        $order->time,
+                        $order->crypto,
+                        "$" . number_format($order->price, 2),
+                        ucfirst($order->action),
+                        number_format($order->amount, 8),
+                        "$" . number_format($order->total, 2)
+                    ]);
+                }
+                $table->display();
+            } else {
+                echo "No orders to display.\n";
             }
-            $table->display();
         } else {
-            echo "No transactions found.\n";
+            echo "No orders to display.\n";
         }
     }
 }
 
-$app = new CryptoApp();
 
-echo "WELCOME TO CRYPTO TRADE APP\n";
+$app = new CryptoApp();
+echo "\nWELCOME TO CRYPTO TRADE APP\n";
 while (true) {
     echo "1. Check balance\n";
-    echo "2. Display 10 trending cryptos\n";
-    echo "3. Search for a Crypto\n";
-    echo "4. Buy Crypto\n";
-    echo "5. Sell Crypto\n";
+    echo "2. Display top 10 trending cryptos\n";
+    echo "3. Search for a crypto by symbol\n";
+    echo "4. Buy crypto\n";
+    echo "5. Sell crypto\n";
     echo "6. Display all transactions\n";
     echo "7. Exit\n";
 
     $choice = readline("Enter your choice: ");
     switch ($choice) {
         case 1:
-            $app->checkBalance();
+            $app->displayBalance();
             break;
         case 2:
-            $app->displayTopTrendingCryptos();
+            $app->displayTopCryptos();
             break;
         case 3:
             $shortName = readline("Enter the cryptocurrency symbol (e.g., ETH, BTC): ");
-            $app->searchCrypto(strtoupper($shortName));
+            $app->searchCrypto($shortName);
             break;
         case 4:
-            $shortName = readline("Enter the cryptocurrency symbol (e.g., ETH, BTC): ");
-            $app->buyCrypto(strtoupper($shortName));
+            $shortName = readline("Enter the cryptocurrency symbol to buy (e.g., ETH, BTC): ");
+            $app->buyCrypto($shortName);
             break;
         case 5:
-            $shortName = readline("Enter the cryptocurrency symbol (e.g., ETH, BTC): ");
-            $app->sellCrypto(strtoupper($shortName));
+            $shortName = readline("Enter the cryptocurrency symbol to sell (e.g., ETH, BTC): ");
+            $app->sellCrypto($shortName);
             break;
-
         case 6:
-            $app->displayTransactions();
+            $app->displayOrders();
             break;
         case 7:
-            exit("Exiting...\n");
+            exit("Goodbye!\n");
         default:
             echo "Invalid choice. Please try again.\n";
     }
