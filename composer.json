@@ -4,6 +4,7 @@
     "ext-json": "*",
     "phplucidframe/console-table": "^1.2",
     "ext-readline": "*",
-    "nesbot/carbon": "^3.5"
+    "nesbot/carbon": "^3.5",
+    "vlucas/phpdotenv": "^5.6"
   }
 }
