@@ -2,61 +2,91 @@
 
 namespace User;
 
+use Medoo\Medoo;
+use Exception;
+
 class User
 {
+    private Medoo $database;
     private float $balance;
     private string $name;
     private array $cryptoBalance;
 
-    public function __construct(float $balance, string $name, array $cryptoBalance) {
-        $this->balance = $balance;
-        $this->name = $name;
-        $this->cryptoBalance = $cryptoBalance;
+    public function __construct(Medoo $database)
+    {
+        $this->database = $database;
+        $this->loadUser();
     }
 
-    public function getBalance(): float {
-        return $this->balance;
-    }
-
-    public function getName(): string {
-        return $this->name;
-    }
-
-    public function getCryptoBalance(): array {
-        return $this->cryptoBalance;
-    }
-
-    public function updateBalance(float $amount) {
-        $this->balance += $amount;
-    }
-
-    public function updateCryptoBalance(string $symbol, float $amount) {
-        if (isset($this->cryptoBalance[$symbol])) {
-            $this->cryptoBalance[$symbol] += $amount;
-        } else {
-            $this->cryptoBalance[$symbol] = $amount;
+    private function loadUser()
+    {
+        try {
+            $userData = $this->database->get('user', '*', ['id' => 1]);
+            if ($userData) {
+                $this->balance = (float)$userData['balance'];
+                $this->name = $userData['name'];
+                $this->cryptoBalance = json_decode($userData['crypto_balance'], true);
+            } else {
+                $this->balance = 1000.00;
+                $this->name = 'Default User';
+                $this->cryptoBalance = [];
+                $this->saveUser();
+            }
+        } catch (Exception $e) {
+            throw new Exception("Failed to load user: " . $e->getMessage());
         }
     }
 
-    public function saveBalance() {
-        $data = [
-            'balance' => $this->balance,
-            'name' => $this->name,
-            'cryptoBalance' => $this->cryptoBalance
-        ];
-        file_put_contents(__DIR__ . '/Data/user.json', json_encode($data, JSON_PRETTY_PRINT));
+    public function saveUser()
+    {
+        try {
+            $this->database->replace('user', [
+                'id' => 1,
+                'balance' => $this->balance,
+                'name' => $this->name,
+                'crypto_balance' => json_encode($this->cryptoBalance)
+            ]);
+        } catch (Exception $e) {
+            throw new Exception("Failed to save user: " . $e->getMessage());
+        }
     }
 
-    public static function loadUser(): User {
-        $data = json_decode(file_get_contents(__DIR__ . '/Data/user.json'), true);
-        return new User($data['balance'], $data['name'], $data['cryptoBalance']);
+    public function getBalance(): float
+    {
+        return $this->balance;
     }
 
-    public function displayBalance() {
-        echo "User Balance: $" . number_format($this->balance, 2) . "\n";
-        echo "Cryptocurrency Holdings:\n";
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function getCryptoBalance(): array
+    {
+        return $this->cryptoBalance;
+    }
+
+    public function updateBalance(float $amount)
+    {
+        $this->balance += $amount;
+        $this->saveUser();
+    }
+
+    public function updateCryptoBalance(string $symbol, float $amount)
+    {
+        if (!isset($this->cryptoBalance[$symbol])) {
+            $this->cryptoBalance[$symbol] = 0;
+        }
+        $this->cryptoBalance[$symbol] += $amount;
+        $this->saveUser();
+    }
+
+    public function displayBalance()
+    {
+        echo "Balance: $" . number_format($this->balance, 2) . "\n";
+        echo "Cryptocurrencies:\n";
         foreach ($this->cryptoBalance as $symbol => $amount) {
-            echo strtoupper($symbol) . ": " . number_format($amount, 8) . "\n";
+            echo "$symbol: $amount\n";
         }
     }
 }

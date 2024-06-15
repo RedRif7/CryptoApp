@@ -2,79 +2,55 @@
 
 namespace Transactions;
 
-use Carbon\Carbon;
+use Medoo\Medoo;
 use User\User;
-use LucidFrame\Console\ConsoleTable;
+use Exception;
 
-class Transactions {
+class Transactions
+{
+    private Medoo $database;
     private User $user;
 
-    public function __construct(User $user) {
+    public function __construct(Medoo $database, User $user)
+    {
+        $this->database = $database;
         $this->user = $user;
     }
 
-    private function saveTransaction(string $symbol, float $amount, float $price, string $type) {
-        $transactions = json_decode(file_get_contents(__DIR__ . '/Data/transactions.json'), false);
-
-        $transaction = [
-            'time' => Carbon::now()->toDateTimeString(),
-            'symbol' => $symbol,
-            'amount' => $amount,
-            'price' => $price,
-            'type' => $type,
-            'total' => $amount * $price
-        ];
-
-        $transactions[] = $transaction;
-        file_put_contents(__DIR__ . '/Data/transactions.json', json_encode($transactions, JSON_PRETTY_PRINT));
-    }
-
-    public function buyCrypto(string $symbol, float $price, float $amount) {
-        $totalCost = $amount * $price;
-        if ($this->user->getBalance() < $totalCost) {
-            echo "Insufficient balance.\n";
-            return;
-        }
-
-        $this->user->updateBalance(-$totalCost);
-        $this->user->updateCryptoBalance($symbol, $amount);
-        $this->saveTransaction($symbol, $amount, $price, 'buy');
-        echo "Bought $amount of $symbol at $price each.\n";
-    }
-
-    public function sellCrypto(string $symbol, float $price, float $amount) {
-        $cryptoBalance = $this->user->getCryptoBalance();
-        if (!isset($cryptoBalance[$symbol]) || $cryptoBalance[$symbol] < $amount) {
-            echo "Insufficient cryptocurrency balance.\n";
-            return;
-        }
-
-        $totalProceeds = $amount * $price;
-        $this->user->updateBalance($totalProceeds);
-        $this->user->updateCryptoBalance($symbol, -$amount);
-        $this->saveTransaction($symbol, $amount, $price, 'sell');
-        echo "Sold $amount of $symbol at $price each.\n";
-    }
-
-    public function displayOrders() {
-        $transactions = json_decode(file_get_contents(__DIR__ . '/Data/transactions.json'), false);
-        if (empty($transactions)) {
-            echo "No transactions found.\n";
-            return;
-        }
-
-        $table = new ConsoleTable();
-        $table->setHeaders(['Time', 'Symbol', 'Amount', 'Price', 'Type', 'Total']);
-        foreach ($transactions as $transaction) {
-            $table->addRow([
-                $transaction->time,
-                $transaction->symbol,
-                $transaction->amount,
-                "$".number_format($transaction->price,5),
-                $transaction->type,
-                "$".$transaction->total
+    public function logTransaction(string $type, string $symbol, float $price, float $amount)
+    {
+        try {
+            $this->database->insert('transactions', [
+                'type' => $type,
+                'symbol' => $symbol,
+                'price' => $price,
+                'amount' => $amount,
+                'timestamp' => date('Y-m-d H:i:s')
             ]);
+        } catch (Exception $e) {
+            throw new Exception("Failed to log transaction: " . $e->getMessage());
         }
-        $table->display();
+    }
+
+    public function displayOrders()
+    {
+        try {
+            $orders = $this->database->select('transactions', '*');
+            if ($orders) {
+                foreach ($orders as $order) {
+                    echo "ID: " . $order['id'] . "\n";
+                    echo "Type: " . $order['type'] . "\n";
+                    echo "Symbol: " . $order['symbol'] . "\n";
+                    echo "Price: " . $order['price'] . "\n";
+                    echo "Amount: " . $order['amount'] . "\n";
+                    echo "Timestamp: " . $order['timestamp'] . "\n";
+                    echo "-------------------------\n";
+                }
+            } else {
+                echo "No transactions found.\n";
+            }
+        } catch (Exception $e) {
+            throw new Exception("Failed to display orders: " . $e->getMessage());
+        }
     }
 }

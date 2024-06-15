@@ -4,7 +4,10 @@ namespace Crypto;
 
 interface CryptoApi
 {
-    public function getTopCryptos(int $limit = 10): array;
+    public function getTopCryptos(): array;
+
     public function getCryptoPrice(string $symbol): ?float;
-    public function searchCrypto(string $symbol): ?Currency;
+
+    public function getCryptoBySymbol(string $symbol): ?object;
+
 }
