@@ -1,10 +1,20 @@
 {
+  "autoload": {
+    "psr-4": {
+      "Crypto\\": "app/Crypto/",
+      "Transactions\\": "app/Transactions/",
+      "User\\": "app/User/",
+      "Wallet\\": "app/Wallet/"
+    }
+  },
   "require": {
     "ext-curl": "*",
     "ext-json": "*",
     "phplucidframe/console-table": "^1.2",
     "ext-readline": "*",
     "nesbot/carbon": "^3.5",
-    "vlucas/phpdotenv": "^5.6"
+    "vlucas/phpdotenv": "^5.6",
+    "guzzlehttp/guzzle": "^7.8",
+    "doctrine/dbal": "^4.0"
   }
 }

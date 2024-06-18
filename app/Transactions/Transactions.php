@@ -2,79 +2,64 @@
 
 namespace Transactions;
 
-use Carbon\Carbon;
-use User\User;
 use LucidFrame\Console\ConsoleTable;
 
-class Transactions {
-    private User $user;
+class Transactions
+{
+    private string $filePath;
 
-    public function __construct(User $user) {
-        $this->user = $user;
+    public function __construct()
+    {
+        $this->filePath = __DIR__ . '/Data/transactions.json';
     }
 
-    private function saveTransaction(string $symbol, float $amount, float $price, string $type) {
-        $transactions = json_decode(file_get_contents(__DIR__ . '/Data/transactions.json'), false);
+    public function displayUserTransactions(string $userName)
+    {
+        $transactionsData = $this->getAllTransactions();
 
-        $transaction = [
-            'time' => Carbon::now()->toDateTimeString(),
-            'symbol' => $symbol,
-            'amount' => $amount,
-            'price' => $price,
-            'type' => $type,
-            'total' => $amount * $price
-        ];
+        $userTransactions = array_filter($transactionsData, function ($transaction) use ($userName) {
+            return $transaction['user'] === $userName;
+        });
 
-        $transactions[] = $transaction;
-        file_put_contents(__DIR__ . '/Data/transactions.json', json_encode($transactions, JSON_PRETTY_PRINT));
-    }
-
-    public function buyCrypto(string $symbol, float $price, float $amount) {
-        $totalCost = $amount * $price;
-        if ($this->user->getBalance() < $totalCost) {
-            echo "Insufficient balance.\n";
-            return;
-        }
-
-        $this->user->updateBalance(-$totalCost);
-        $this->user->updateCryptoBalance($symbol, $amount);
-        $this->saveTransaction($symbol, $amount, $price, 'buy');
-        echo "Bought $amount of $symbol at $price each.\n";
-    }
-
-    public function sellCrypto(string $symbol, float $price, float $amount) {
-        $cryptoBalance = $this->user->getCryptoBalance();
-        if (!isset($cryptoBalance[$symbol]) || $cryptoBalance[$symbol] < $amount) {
-            echo "Insufficient cryptocurrency balance.\n";
-            return;
-        }
-
-        $totalProceeds = $amount * $price;
-        $this->user->updateBalance($totalProceeds);
-        $this->user->updateCryptoBalance($symbol, -$amount);
-        $this->saveTransaction($symbol, $amount, $price, 'sell');
-        echo "Sold $amount of $symbol at $price each.\n";
-    }
-
-    public function displayOrders() {
-        $transactions = json_decode(file_get_contents(__DIR__ . '/Data/transactions.json'), false);
-        if (empty($transactions)) {
-            echo "No transactions found.\n";
+        if (empty($userTransactions)) {
+            echo "No transactions found for user $userName.\n";
             return;
         }
 
         $table = new ConsoleTable();
-        $table->setHeaders(['Time', 'Symbol', 'Amount', 'Price', 'Type', 'Total']);
-        foreach ($transactions as $transaction) {
+        $table->setHeaders(['Date', 'Type', 'Symbol', 'Amount', 'Price']);
+
+        foreach ($userTransactions as $transaction) {
             $table->addRow([
-                $transaction->time,
-                $transaction->symbol,
-                $transaction->amount,
-                "$".number_format($transaction->price,5),
-                $transaction->type,
-                "$".$transaction->total
+                $transaction['date'],
+                $transaction['type'],
+                $transaction['symbol'],
+                $transaction['amount'],
+                '$' . number_format($transaction['price'], 2)
             ]);
         }
+
+        echo "Transactions for $userName:\n";
         $table->display();
+    }
+
+    public function recordTransaction(array $transaction)
+    {
+        $transactions = $this->getAllTransactions();
+        $transactions[] = $transaction;
+        $this->saveTransactions($transactions);
+    }
+
+    private function getAllTransactions(): array
+    {
+        if (!file_exists($this->filePath)) {
+            return [];
+        }
+        return json_decode(file_get_contents($this->filePath), true);
+    }
+
+    private function saveTransactions(array $transactions): void
+    {
+        file_put_contents($this->filePath, json_encode($transactions, JSON_PRETTY_PRINT));
     }
 }
