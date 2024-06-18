@@ -1,0 +1,16 @@
+{
+    "kristaps": {
+        "passwordHash": "fe267bba35d93b53144d0365be94217e",
+        "wallet": {
+            "balance": 1000,
+            "cryptoBalance": []
+        }
+    },
+    "alise": {
+        "passwordHash": "6cb75f652a9b52798eb6cf2201057c73",
+        "wallet": {
+            "balance": 1000,
+            "cryptoBalance": []
+        }
+    }
+}
