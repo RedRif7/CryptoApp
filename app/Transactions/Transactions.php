@@ -2,64 +2,34 @@
 
 namespace Transactions;
 
-use LucidFrame\Console\ConsoleTable;
-
 class Transactions
 {
-    private string $filePath;
+    private $transactionsFile;
 
     public function __construct()
     {
-        $this->filePath = __DIR__ . '/Data/transactions.json';
-    }
-
-    public function displayUserTransactions(string $userName)
-    {
-        $transactionsData = $this->getAllTransactions();
-
-        $userTransactions = array_filter($transactionsData, function ($transaction) use ($userName) {
-            return $transaction['user'] === $userName;
-        });
-
-        if (empty($userTransactions)) {
-            echo "No transactions found for user $userName.\n";
-            return;
+        $this->transactionsFile = __DIR__ . '/Data/transactions.json';
+        if (!file_exists($this->transactionsFile)) {
+            file_put_contents($this->transactionsFile, json_encode([]));
         }
-
-        $table = new ConsoleTable();
-        $table->setHeaders(['Date', 'Type', 'Symbol', 'Amount', 'Price']);
-
-        foreach ($userTransactions as $transaction) {
-            $table->addRow([
-                $transaction['date'],
-                $transaction['type'],
-                $transaction['symbol'],
-                $transaction['amount'],
-                '$' . number_format($transaction['price'], 2)
-            ]);
-        }
-
-        echo "Transactions for $userName:\n";
-        $table->display();
     }
 
-    public function recordTransaction(array $transaction)
+    public function addTransaction(string $user, string $type, string $symbol, float $amount, float $price)
     {
-        $transactions = $this->getAllTransactions();
-        $transactions[] = $transaction;
-        $this->saveTransactions($transactions);
+        $transactions = json_decode(file_get_contents($this->transactionsFile), true);
+        $transactions[] = [
+            'user' => $user,
+            'type' => $type,
+            'symbol' => $symbol,
+            'amount' => $amount,
+            'price' => $price,
+            'date' => date('Y-m-d H:i:s')
+        ];
+        file_put_contents($this->transactionsFile, json_encode($transactions));
     }
 
-    private function getAllTransactions(): array
+    public function getTransactions(): array
     {
-        if (!file_exists($this->filePath)) {
-            return [];
-        }
-        return json_decode(file_get_contents($this->filePath), true);
-    }
-
-    private function saveTransactions(array $transactions): void
-    {
-        file_put_contents($this->filePath, json_encode($transactions, JSON_PRETTY_PRINT));
+        return json_decode(file_get_contents($this->transactionsFile), true);
     }
 }

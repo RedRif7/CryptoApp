@@ -1,0 +1,8 @@
+<h1>Search Result</h1>
+{% if crypto %}
+    <p>Name: {{ crypto.name }}</p>
+    <p>Symbol: {{ crypto.symbol }}</p>
+    <p>Price: {{ crypto.price }}</p>
+{% else %}
+    <p>Crypto not found.</p>
+{% endif %}

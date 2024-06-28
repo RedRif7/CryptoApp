@@ -2,8 +2,8 @@
 
 namespace Crypto;
 
-use LucidFrame\Console\ConsoleTable;
 use GuzzleHttp\Client;
+use Dotenv\Dotenv;
 
 class CoinMarketCapApi implements CryptoApi
 {
@@ -13,8 +13,10 @@ class CoinMarketCapApi implements CryptoApi
 
     public function __construct()
     {
+        $dotenv = Dotenv::createImmutable(__DIR__);
+        $dotenv->load();
         $this->client = new Client();
-        $this->apiKey = '868535e9-2644-4b1e-9209-3363a0da0dd0'; // Replace with your actual CoinMarketCap API key
+        $this->apiKey = $_ENV['COINMARKET_API_KEY'];
         $this->url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest';
     }
 
@@ -67,16 +69,10 @@ class CoinMarketCapApi implements CryptoApi
             return;
         }
 
-        $table = new ConsoleTable();
-        $table->setHeaders(['Name', 'Symbol', 'Price']);
-
-        $table->addRow([$crypto['name'], $crypto['symbol'], '$' . number_format($crypto['price'], 2)]);
-
-        echo "Crypto Information for $symbol:\n";
-        $table->display();
+        return $crypto;
     }
 
-    private function getCryptoBySymbol(string $symbol, array $cryptos)
+    public function getCryptoBySymbol(string $symbol, array $cryptos)
     {
         foreach ($cryptos as $crypto) {
             if ($crypto['symbol'] === $symbol) {
@@ -84,18 +80,5 @@ class CoinMarketCapApi implements CryptoApi
             }
         }
         return null;
-    }
-
-    public function displayTopCryptos(array $cryptos)
-    {
-        $table = new ConsoleTable();
-        $table->setHeaders(['ID', 'Name', 'Symbol', 'Price']);
-
-        foreach ($cryptos as $index => $crypto) {
-            $table->addRow([$index + 1, $crypto['name'], $crypto['symbol'], '$' . number_format($crypto['price'], 2)]);
-        }
-
-        echo "Top Cryptocurrencies:\n";
-        $table->display();
     }
 }

@@ -1,0 +1,19 @@
+<h1>Top Currencies</h1>
+<table>
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>Symbol</th>
+        <th>Price</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for crypto in cryptos %}
+        <tr>
+            <td>{{ crypto.name }}</td>
+            <td>{{ crypto.symbol }}</td>
+            <td>{{ crypto.price }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
